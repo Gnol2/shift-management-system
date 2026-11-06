@@ -1,5 +1,5 @@
+import { Link, Navigate } from 'react-router-dom';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { addDays, api, iso, Mine, monday, Shift } from './api';
 import { useAuth } from './auth';
@@ -27,6 +27,37 @@ export function Login() {
           <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-2.5 text-slate-400">{show ? <EyeOff size={18} /> : <Eye size={18} />}</button>
         </div>
         <button disabled={busy} className={`${btn} w-full bg-indigo-600 text-white hover:bg-indigo-700`}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        <p className="text-center text-sm text-slate-500">No account? <Link to="/register" className="font-medium text-indigo-600">Create one</Link></p>
+      </form>
+    </div>);
+}
+
+export function Register() {
+  const { user, register } = useAuth();
+  const [f, setF] = useState({ name: '', email: '', password: '', confirm: '' });
+  const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  if (user) return <Navigate to="/" replace />;
+  const submit = async (e: FormEvent) => {
+    e.preventDefault(); setErr('');
+    if (f.name.trim().length < 2 || f.name.includes('@')) return setErr('Name must be at least 2 characters and cannot contain @');
+    if (f.email && !/^\S+@\S+\.\S+$/.test(f.email)) return setErr('Email is not valid');
+    if (f.password.length < 8) return setErr('Password must be at least 8 characters');
+    if (f.password !== f.confirm) return setErr('Passwords do not match');
+    setBusy(true);
+    try { await register(f.name.trim(), f.email.trim(), f.password); } catch (x: any) { setErr(x.message); } finally { setBusy(false); }
+  };
+  const inp = 'w-full rounded-lg border px-3 py-2';
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 to-slate-100 p-4">
+      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl border bg-white p-8 shadow-lg">
+        <h1 className="text-2xl font-bold text-indigo-600">Create account</h1><p className="text-sm text-slate-500">You will sign in with your name</p>
+        {err && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{err}</div>}
+        <input className={inp} placeholder="Name (used to sign in)" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+        <input className={inp} placeholder="Email (optional)" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+        <input className={inp} type="password" placeholder="Password (min 8)" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+        <input className={inp} type="password" placeholder="Confirm password" value={f.confirm} onChange={(e) => setF({ ...f, confirm: e.target.value })} />
+        <button disabled={busy} className={`${btn} w-full bg-indigo-600 text-white hover:bg-indigo-700`}>{busy ? 'Creating…' : 'Create account'}</button>
+        <p className="text-center text-sm text-slate-500">Already have an account? <Link to="/login" className="font-medium text-indigo-600">Sign in</Link></p>
       </form>
     </div>);
 }

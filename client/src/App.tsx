@@ -1,7 +1,7 @@
 import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom';
 import { CalendarDays, LayoutDashboard, ListChecks, LogOut, Shield, Users, ClipboardList } from 'lucide-react';
 import { useAuth } from './auth';
-import { CalendarPage, Dashboard, Login, MyShifts } from './pages';
+import { CalendarPage, Dashboard, Login, MyShifts, Register } from './pages';
 import { AdminOverview, AdminRegs, AdminUsers } from './admin';
 
 const link = ({ isActive }: { isActive: boolean }) =>
@@ -37,6 +37,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
       <Route element={<Guard />}>
         <Route index element={<Dashboard />} /><Route path="calendar" element={<CalendarPage />} /><Route path="my" element={<MyShifts />} />
       </Route>

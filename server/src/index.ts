@@ -85,7 +85,25 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173' }));
 app.use(express.json({ limit: '100kb' }));
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: true });
-
+const registerLimiter = rateLimit({ windowMs: 60 * 60_000, limit: 10, standardHeaders: true });
+app.post('/api/auth/register', registerLimiter, h(async (req, res) => {
+  const b = z.object({
+    name: z.string().trim().min(2, 'Name must be at least 2 characters').max(50).regex(/^[^@]+$/, 'Name cannot contain @'),
+    email: z.union([z.literal(''), z.string().trim().email('Email is not valid')]).optional(),
+    password: z.string().min(8, 'Password must be at least 8 characters').max(100),
+  }).parse(req.body);
+  const email = b.email ?? '';
+  const hash = await bcrypt.hash(b.password, 10);
+  const row = await withLock(async () => {
+    const users = await readAll('Users');
+    if (users.some((u) => String(u.name).trim().toLowerCase() === b.name.toLowerCase())) throw new HttpError(409, 'Name already exists');
+    if (email && users.some((u) => String(u.email).toLowerCase() === email.toLowerCase())) throw new HttpError(409, 'Email already exists');
+    const r = { id: randomUUID(), name: b.name, email, passwordHash: hash, role: 'user', active: true, createdAt: new Date().toISOString() };
+    users.push(r); await writeAll('Users', users); return r;
+  });
+  const token = jwt.sign({ sub: row.id, role: row.role }, JWT_SECRET, { expiresIn: '8h' });
+  ok(res, { token, user: pub(row) }, 201);
+}));
 app.post('/api/auth/login', loginLimiter, h(async (req, res) => {
   const { email, password } = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(req.body);
   const user = (await readAll('Users')).find((u) => String(u.email).toLowerCase() === email.toLowerCase());
@@ -203,7 +221,7 @@ if (fs.existsSync(clientDist)) {
 
 // ---- errors ----
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  if (err instanceof z.ZodError) return res.status(400).json({ success: false, error: 'Validation failed', details: err.issues.map((i) => i.message) });
+  if (err instanceof z.ZodError) return res.status(400).json({ success: false, error: err.issues.map((i) => i.message).join(', '), details: err.issues.map((i) => i.message) });
   if (err instanceof HttpError) return res.status(err.status).json({ success: false, error: err.message });
   console.error(err); // log server-side only; never leak stack traces
   res.status(500).json({ success: false, error: 'Internal server error' });
