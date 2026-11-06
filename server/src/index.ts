@@ -6,10 +6,15 @@ import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
+import path from 'path';
+import fs from 'fs';
 import { z } from 'zod';
 import { readAll, writeAll, withLock, Row } from './db';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-only-secret-change-me';
+if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 24)) {
+  console.error('JWT_SECRET must be set (>= 24 chars) in production'); process.exit(1);
+}
 const MAX_USERS = 2;
 
 class HttpError extends Error { constructor(public status: number, msg: string) { super(msg); } }
@@ -74,6 +79,7 @@ const authAsync = (req: any, res: Response, next: NextFunction) => {
 
 // ---- app ----
 const app = express();
+app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173' }));
 app.use(express.json({ limit: '100kb' }));
@@ -188,6 +194,12 @@ admin.get('/stats', h(async (_req, res) => {
     totalRegistrations: regs.length, activeUsers: users.filter(isActive).length, monthly });
 }));
 app.use('/api/admin', admin);
+
+const clientDist = path.resolve(__dirname, '../../client/dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get(/^\/(?!api).*/, (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+}
 
 // ---- errors ----
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

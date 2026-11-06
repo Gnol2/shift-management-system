@@ -6,6 +6,7 @@
     "build": "npm --prefix server run build",
     "start": "npm --prefix server start",
     "dev:client": "npm --prefix client run dev",
-    "build:client": "npm --prefix client run build"
+    "build:client": "npm --prefix client run build",
+    "build:render": "npm --prefix client install --include=dev && npm --prefix client run build:prod && npm --prefix server install"
   }
 }
