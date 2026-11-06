@@ -11,10 +11,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api<User>('/auth/me').then(setUser).catch(() => localStorage.removeItem('token')).finally(() => setReady(true));
   }, []);
   const login = async (email: string, password: string) => {
-    const r = await api<{ token: string; user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    const r = await api<{ token: string; user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ identifier: email, password }) });
     localStorage.setItem('token', r.token); setUser(r.user);
   };
-    const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string) => {
     const r = await api<{ token: string; user: User }>('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password }) });
     localStorage.setItem('token', r.token); setUser(r.user);
   };

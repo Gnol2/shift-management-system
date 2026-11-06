@@ -1,5 +1,5 @@
-import { Link, Navigate } from 'react-router-dom';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { addDays, api, iso, Mine, monday, Shift } from './api';
 import { useAuth } from './auth';
@@ -12,7 +12,7 @@ export function Login() {
   if (user) return <Navigate to="/" replace />;
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setErr('');
-    if (!/^\S+@\S+\.\S+$/.test(email) || !pw) return setErr('Enter a valid email and password');
+    if (!email.trim() || !pw) return setErr('Enter your name (or email) and password');
     setBusy(true);
     try { await login(email, pw); } catch (x: any) { setErr(x.message); } finally { setBusy(false); }
   };
@@ -21,7 +21,7 @@ export function Login() {
       <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-2xl border bg-white p-8 shadow-lg">
         <h1 className="text-2xl font-bold text-indigo-600">ShiftHub</h1><p className="text-sm text-slate-500">Sign in to manage duty shifts</p>
         {err && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{err}</div>}
-        <input className="w-full rounded-lg border px-3 py-2" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input className="w-full rounded-lg border px-3 py-2" placeholder="Name or email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <div className="relative">
           <input className="w-full rounded-lg border px-3 py-2 pr-10" placeholder="Password" type={show ? 'text' : 'password'} value={pw} onChange={(e) => setPw(e.target.value)} />
           <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-2.5 text-slate-400">{show ? <EyeOff size={18} /> : <Eye size={18} />}</button>
@@ -44,7 +44,7 @@ export function Register() {
     if (f.password.length < 8) return setErr('Password must be at least 8 characters');
     if (f.password !== f.confirm) return setErr('Passwords do not match');
     setBusy(true);
-    try { await register(f.name.trim(), f.email.trim(), f.password); } catch (x: any) { setErr(x.message); } finally { setBusy(false); }
+    try { await register(f.name.trim(), f.email.trim(), f.password) } catch (x: any) { setErr(x.message); } finally { setBusy(false); }
   };
   const inp = 'w-full rounded-lg border px-3 py-2';
   return (

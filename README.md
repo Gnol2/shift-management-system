@@ -16,7 +16,7 @@ Shifts: id (`YYYY-MM-DD_HH00`), date, startTime, endTime, maxUsers, createdAt
 Registrations: id, shiftId, userId, createdAt
 
 ## API (all JSON `{success,data|error}`; Bearer JWT)
-POST /api/auth/login · POST /api/auth/logout · GET /api/auth/me
+POST /api/auth/register {name, email?, password} · POST /api/auth/login {identifier: name or email, password} · POST /api/auth/logout · GET /api/auth/me
 GET /api/shifts?date=YYYY-MM-DD (auto-generates 12 shifts)
 POST|DELETE /api/shifts/:id/register · GET /api/registrations/mine
 Admin: GET|POST /api/admin/users · PATCH /api/admin/users/:id · GET /api/admin/registrations?date&userId&shiftId · DELETE /api/admin/registrations/:id · GET /api/admin/stats

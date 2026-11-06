@@ -79,12 +79,23 @@ const authAsync = (req: any, res: Response, next: NextFunction) => {
 
 // ---- app ----
 const app = express();
-app.set('trust proxy', 1);
+app.set('trust proxy', 1); // behind Render's proxy (needed for rate limiting)
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173' }));
 app.use(express.json({ limit: '100kb' }));
 
 const loginLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: true });
+
+app.post('/api/auth/login', loginLimiter, h(async (req, res) => {
+  const { identifier, password } = z.object({ identifier: z.string().trim().min(1), password: z.string().min(1) }).parse(req.body);
+  const key = identifier.toLowerCase();
+  const all = await readAll('Users');
+  const byName = all.filter((u) => String(u.name).trim().toLowerCase() === key);
+  const user = all.find((u) => String(u.email).toLowerCase() === key) ?? (byName.length === 1 ? byName[0] : undefined);
+  if (!user || !isActive(user) || !(await bcrypt.compare(password, String(user.passwordHash)))) throw new HttpError(401, 'Invalid credentials');
+  const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
+  ok(res, { token, user: pub(user) });
+}));
 const registerLimiter = rateLimit({ windowMs: 60 * 60_000, limit: 10, standardHeaders: true });
 app.post('/api/auth/register', registerLimiter, h(async (req, res) => {
   const b = z.object({
@@ -103,13 +114,6 @@ app.post('/api/auth/register', registerLimiter, h(async (req, res) => {
   });
   const token = jwt.sign({ sub: row.id, role: row.role }, JWT_SECRET, { expiresIn: '8h' });
   ok(res, { token, user: pub(row) }, 201);
-}));
-app.post('/api/auth/login', loginLimiter, h(async (req, res) => {
-  const { email, password } = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(req.body);
-  const user = (await readAll('Users')).find((u) => String(u.email).toLowerCase() === email.toLowerCase());
-  if (!user || !isActive(user) || !(await bcrypt.compare(password, String(user.passwordHash)))) throw new HttpError(401, 'Invalid credentials');
-  const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
-  ok(res, { token, user: pub(user) });
 }));
 app.post('/api/auth/logout', authAsync, (_req, res) => ok(res, null)); // stateless JWT: client discards token
 app.get('/api/auth/me', authAsync, (req: any, res) => ok(res, pub(req.user)));
@@ -168,7 +172,7 @@ admin.post('/users', h(async (req, res) => {
     const users = await readAll('Users');
     if (users.some((u) => String(u.email).toLowerCase() === b.email.toLowerCase())) throw new HttpError(409, 'Email already exists');
     if (users.some((u) => String(u.name).trim().toLowerCase() === b.name.trim().toLowerCase())) throw new HttpError(409, 'Name already exists');
-    const r = { id: randomUUID(), name: b.name, email: b.email, passwordHash: hash, role: b.role, active: true, status: 'approved', createdAt: new Date().toISOString() };
+    const r = { id: randomUUID(), name: b.name, email: b.email, passwordHash: hash, role: b.role, active: true, createdAt: new Date().toISOString() };
     users.push(r); await writeAll('Users', users); return r;
   });
   ok(res, pub(row), 201);
@@ -180,6 +184,7 @@ admin.patch('/users/:id', h(async (req, res) => {
     const users = await readAll('Users');
     const u = users.find((x) => x.id === req.params.id);
     if (!u) throw new HttpError(404, 'User not found');
+    if (b.name && users.some((x) => x.id !== u.id && String(x.name).trim().toLowerCase() === b.name!.trim().toLowerCase())) throw new HttpError(409, 'Name already exists');
     if (req.params.id === req.user.id && (b.active === false || (b.role && b.role !== 'admin'))) throw new HttpError(400, 'You cannot demote or deactivate yourself');
     if (b.name) u.name = b.name; if (b.email) u.email = b.email; if (b.role) u.role = b.role;
     if (b.active !== undefined) u.active = b.active; if (hash) u.passwordHash = hash;
@@ -214,6 +219,7 @@ admin.get('/stats', h(async (_req, res) => {
 }));
 app.use('/api/admin', admin);
 
+// ---- serve built frontend (single-service deploy) ----
 const clientDist = path.resolve(__dirname, '../../client/dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
