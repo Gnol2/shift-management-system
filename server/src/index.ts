@@ -167,7 +167,8 @@ admin.post('/users', h(async (req, res) => {
   const row = await withLock(async () => {
     const users = await readAll('Users');
     if (users.some((u) => String(u.email).toLowerCase() === b.email.toLowerCase())) throw new HttpError(409, 'Email already exists');
-    const r = { id: randomUUID(), name: b.name, email: b.email, passwordHash: hash, role: b.role, active: true, createdAt: new Date().toISOString() };
+    if (users.some((u) => String(u.name).trim().toLowerCase() === b.name.trim().toLowerCase())) throw new HttpError(409, 'Name already exists');
+    const r = { id: randomUUID(), name: b.name, email: b.email, passwordHash: hash, role: b.role, active: true, status: 'approved', createdAt: new Date().toISOString() };
     users.push(r); await writeAll('Users', users); return r;
   });
   ok(res, pub(row), 201);
